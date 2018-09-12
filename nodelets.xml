@@ -1,0 +1,23 @@
+<library path="lib/libHumanDetectNodelet">
+
+  <class name="lims2_vision/HumanDetectNodelet"
+	 type="lims2_vision::HumanDetectNodelet"
+	 base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet to convert raw depth images to sensor_msgs/LaserScans.
+    </description>
+  </class>  
+
+</library>
+
+<library path="lib/libBulletTrackNodelet">
+
+  <class name="lims2_vision/BulletTrackNodelet"
+	 type="lims2_vision::BulletTrackNodelet"
+	 base_class_type="nodelet::Nodelet">
+    <description>
+      Nodelet to convert raw depth images to sensor_msgs/LaserScans.
+    </description>
+  </class>  
+
+</library>
