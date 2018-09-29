@@ -1,22 +1,34 @@
-#ifndef HUMANDETECT_ROS
-#define HUMANDETECT_ROS
+#ifndef GUNDETECT_ROS
+#define GUNDETECT_ROS
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <sensor_msgs/Image.h>
 #include <boost/thread/mutex.hpp>
 #include <lims2_vision/HumanDetect.h>
+#include <lims2_vision/bbox.h>
+#include <vector>
+#include <set>
+#include <list>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
 
 namespace lims2_vision
 {
-    class HumanDetectROS
+    class GunInfo
+    {
+        cv::Rect    _bBox;
+        float       _prob;
+    };
+
+    class GunDetectROS
     {
         public:
-        HumanDetectROS(ros::NodeHandle& n, ros::NodeHandle& pnh);
-        ~HumanDetectROS();
+        GunDetectROS(ros::NodeHandle& n, ros::NodeHandle& pnh);
+        ~GunDetectROS();
 
         private:
-        void imgCb(const sensor_msgs::ImageConstPtr& img_msg, const sensor_msgs::CameraInfoConstPtr& info_msg);
+        void imgCb(const sensor_msgs::ImageConstPtr& img_msg, const sensor_msgs::CameraInfoConstPtr& info_msg);        
         void connectCb(const ros::SingleSubscriberPublisher& pub);
         void disconnectCb(const ros::SingleSubscriberPublisher& pub);
 
@@ -31,6 +43,9 @@ namespace lims2_vision
         ros::Time _prvT;
         
         int _camPos;    // 0 : left, 1 : right
+        std::vector<HumanInfo> _humanROIs;
+        
     };
 }
-#endif
+
+#endif  // GUNDETECT_ROS

@@ -1,7 +1,7 @@
-<library path="lib/libHumanDetectNodelet">
+<library path="lib/libGunDetectNodelet">
 
-  <class name="lims2_vision/HumanDetectNodelet"
-	 type="lims2_vision::HumanDetectNodelet"
+  <class name="lims2_vision/GunDetectNodelet"
+	 type="lims2_vision::GunDetectNodelet"
 	 base_class_type="nodelet::Nodelet">
     <description>
       Nodelet to convert raw depth images to sensor_msgs/LaserScans.

@@ -133,7 +133,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES 
     lims2_vision 
-    HumanDetect HumanDetectROS HumanDetectNodelet 
+    HumanDetect GunDetectROS GunDetectNodelet 
     BulletTrack BulletTrackROS BulletTrackNodelet
   CATKIN_DEPENDS 
     roscpp 
@@ -174,17 +174,17 @@ add_library(HumanDetect src/HumanDetect.cpp)
 add_dependencies(HumanDetect ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(HumanDetect ${tensorflow_ros_cpp_LIBRARIES} ${catkin_LIBRARIES})
 
-add_library(HumanDetectROS src/HumanDetectROS.cpp)
-target_link_libraries(HumanDetectROS HumanDetect ${catkin_LIBRARIES})
+add_library(GunDetectROS src/lims2_vision_util.cpp src/GunDetectROS.cpp src/GunDetect.cpp)
+target_link_libraries(GunDetectROS HumanDetect ${catkin_LIBRARIES})
 
-add_library(HumanDetectNodelet src/HumanDetectNodelet.cpp)
-target_link_libraries(HumanDetectNodelet HumanDetectROS ${catkin_LIBRARIES})
+add_library(GunDetectNodelet src/GunDetectNodelet.cpp)
+target_link_libraries(GunDetectNodelet GunDetectROS ${catkin_LIBRARIES})
 
-add_executable(human_detect src/human_detect.cpp)
-target_link_libraries(human_detect HumanDetectROS ${catkin_LIBRARIES})
+add_executable(gun_detect src/gun_detect.cpp)
+target_link_libraries(gun_detect GunDetectROS ${catkin_LIBRARIES})
 
 
-add_library(BulletTrack src/BulletTrack.cpp src/GunDetect.cpp)
+add_library(BulletTrack src/lims2_vision_util.cpp src/BulletTrack.cpp)
 add_dependencies(BulletTrack ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(BulletTrack ${catkin_LIBRARIES})
 

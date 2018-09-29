@@ -2,8 +2,11 @@
 #include <lims2_vision/BulletTrackROS.h>
 #include <lims2_vision/bbox.h>
 #include <vector>
+#include <string>
+#include <boost/format.hpp>
 
 using namespace lims2_vision;
+using namespace cv;
 
 BulletTrackROS::BulletTrackROS(ros::NodeHandle& n, ros::NodeHandle& pnh):_pnh(pnh), _it(n) 
 {
@@ -15,7 +18,7 @@ BulletTrackROS::BulletTrackROS(ros::NodeHandle& n, ros::NodeHandle& pnh):_pnh(pn
     image_transport::TransportHints hints("raw", ros::TransportHints(), _pnh);
     _sub[0] = _it.subscribeCamera("image_l", 1, &BulletTrackROS::imgCb_l, this, hints);
     _sub[1] = _it.subscribeCamera("image_r", 1, &BulletTrackROS::imgCb_r, this, hints);
-    _subHBBox = nh.subscribe("hbbox", 4, &BulletTrackROS::hbboxCb, this);
+    _subHBBox = nh.subscribe("gbbox", 4, &BulletTrackROS::gbboxCb, this);
 
     _prvT = ros::Time::now();
 }
@@ -25,42 +28,43 @@ BulletTrackROS::~BulletTrackROS() {
     _sub[1].shutdown();
 }
 
-void BulletTrackROS::hbboxCb(const lims2_vision::bbox::ConstPtr& msg)
+void BulletTrackROS::gbboxCb(const bbox::ConstPtr& msg)
 {
-    ROS_INFO_STREAM("hbboxCB: [" << msg->p << ": " << msg->l << ", " << msg->t << ", " 
-                                 << msg->r << ", " << msg->b << "]");
+#ifdef _DEBUG_BT_    
+    ROS_INFO_STREAM("gbboxCB: [" << msg->p << ": " << msg->x << ", " << msg->y << ", " 
+                                 << msg->width << ", " << msg->height << "] : " << msg->stamp.sec << "." << msg->stamp.nsec);
+#endif                                 
 
-    _bTrack.locateHuman(msg);
+    int camPos = msg->p & 0x01;
+    
+    boost::format fmter("gbboxCB: [%1%: %2%, %3%, %4%, %5%] : %6%.%7%");
+    fmter % msg->p % msg->x % msg->y % msg->width % msg->height % msg->stamp.sec % msg->stamp.nsec;
+    _bTrack.updateMsg( fmter.str(), 2+camPos );
+
+    _bTrack.setGunROI( camPos, Rect(msg->x, msg->y, msg->width, msg->height) );
+
+    if ( _bTrack.isTrackingReady() )
+        _bTrack.findBullet_sa();    
 }
 
 void BulletTrackROS::imgCb_l(const sensor_msgs::ImageConstPtr& img_msg, 
                              const sensor_msgs::CameraInfoConstPtr& info_msg) 
 {
-    const ros::Duration T_THR(1,0);
-    ros::Time start_t = ros::Time::now();
-    ros::Duration tdiff = start_t - _prvT;
-    
-    ROS_INFO_STREAM("BTROS imgCB_l: " << tdiff.nsec / 1000000 << "ms, Dim: " << img_msg->width << ", " << img_msg->height);
-
-    if ( _bTrack.setImage(0, img_msg) )
-    {   
-        ROS_ASSERT(0);  // expect paired after getting the right image
-    }
-
-    _prvT = start_t;
+#ifdef _DEBUG_BT_    
+    ROS_INFO_STREAM("imgCb_l: [" << img_msg->header.stamp.sec << "." << img_msg->header.stamp.nsec);
+#endif
+    const int CAMNUM = 0;
+    _bTrack.updateMsg( std::string("imgCb_l: [") + makeString(img_msg->header.stamp) + "]", CAMNUM );
+    _bTrack.setImage(CAMNUM, img_msg);    
 }
 
 void BulletTrackROS::imgCb_r(const sensor_msgs::ImageConstPtr& img_msg, 
                              const sensor_msgs::CameraInfoConstPtr& info_msg) 
 {
-    const ros::Duration T_THR(1,0);
-    ros::Time start_t = ros::Time::now();
-    ros::Duration tdiff = start_t - _prvT;
-    
-    ROS_INFO_STREAM("BTROS imgCB_r: " << tdiff.nsec / 1000000 << "ms");
-
-    if ( _bTrack.setImage(1, img_msg) )
-    {
-        _bTrack.locateGun();
-    }
+#ifdef _DEBUG_BT_    
+    ROS_INFO_STREAM("imgCb_r: [" << img_msg->header.stamp.sec << "." << img_msg->header.stamp.nsec);
+#endif
+    const int CAMNUM = 1;
+    _bTrack.updateMsg( std::string("imgCb_r: [") + makeString(img_msg->header.stamp) + "]", CAMNUM );
+    _bTrack.setImage(CAMNUM, img_msg);    
 }

@@ -52,12 +52,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             <arg name="verbose"              value="$(arg verbose)" />
         </include>
 
-        <node pkg="nodelet" type="nodelet" name="human_detect_l" args="load lims2_vision/HumanDetectNodelet zed_nodelet_manager">
+        <node pkg="nodelet" type="nodelet" name="gun_detect_l" args="load lims2_vision/GunDetectNodelet zed_nodelet_manager">
             <param name="position"          value="0" />
             <remap from="image" to="$(arg left_img_topic)"/>            
         </node>
 
-        <node pkg="nodelet" type="nodelet" name="human_detect_r" args="load lims2_vision/HumanDetectNodelet zed_nodelet_manager">
+        <node pkg="nodelet" type="nodelet" name="gun_detect_r" args="load lims2_vision/GunDetectNodelet zed_nodelet_manager">
             <param name="position"          value="1" />
             <remap from="image" to="$(arg right_img_topic)"/>
         </node>

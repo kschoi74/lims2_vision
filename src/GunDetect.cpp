@@ -53,6 +53,12 @@ Rect Get_Gun(const Mat & img, const Rect & HumanROI)
 	}
 	bottom = idx;
 
-	return Rect(HumanROI.x + left, HumanROI.y + top, right - left, bottom - top);
+	int width = right - left;
+	int height = bottom - top;
+
+	if ( 0 < width && 0 < height )
+		return Rect(HumanROI.x + left, HumanROI.y + top, width, height);
+	else
+		return Rect(-1, -1, -1, -1);
 }
 
