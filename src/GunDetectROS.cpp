@@ -32,67 +32,30 @@ void GunDetectROS::imgCb(const sensor_msgs::ImageConstPtr& img_msg,
     ros::Time start_t = ros::Time::now();
     ros::Duration tdiff = start_t - _prvT;
     
-    cv_bridge::CvImageConstPtr imgPtr = cv_bridge::toCvShare(img_msg, sensor_msgs::image_encodings::BGR8);
+    if (tdiff >= T_THR) {
+        // human detection using tensorflow
+        try {
+            int nHuman = _hdt.detectHuman(img_msg, _humanROIs);
+        }
+        catch (std::runtime_error& e) {
+            ROS_ERROR_THROTTLE(1.0, "Could not detect human: %s", e.what());
+        }
+        _prvT = start_t;
 
-    // FOR DEBUGGING
-    //ROS_INFO_STREAM("imgCb: [" << imgPtr->header.stamp.sec << "." << imgPtr->header.stamp.nsec );
+        _hdt.buildHumanTracks( _humanROIs );
 
-    // For each humanROI, detect a gun
-    Rect humanROI = _hdt.getBestHumanROI();
-    Rect gunROI;
-    bbox gbbox;
-    gbbox.stamp = img_msg->header.stamp;
-    gbbox.p = _camPos;
+        // if there is no person in the scene, ROI is resetted. (-1 -1 -1 -1)
+        Rect humanROI = _hdt.getBestHumanROI();        
+        bbox hbbox;
+        hbbox.stamp = img_msg->header.stamp;
+        hbbox.p = _camPos;
 
-    if ( isValid(humanROI) ) {
-        gunROI = Get_Gun(imgPtr->image, humanROI);
-        //ROS_INFO( makeString(gunROI).c_str() );
-        gbbox.p += 2;   // humanROI is valid
-        gbbox.x = gunROI.x;
-        gbbox.y = gunROI.y;
-        gbbox.width = gunROI.width;
-        gbbox.height = gunROI.height;        
-    }
-    else {
-        gbbox.x = -1;
-        gbbox.y = -1;
-        gbbox.width = -1;
-        gbbox.height = -1;        
-    }
-
-    _pub.publish(gbbox);        
-
-    if (tdiff < T_THR)  return;
-    
-    // human detection using tensorflow
-    try {
-        int nHuman = _hdt.detectHuman(img_msg, _humanROIs);
-    }
-    catch (std::runtime_error& e) {
-        ROS_ERROR_THROTTLE(1.0, "Could not detect human: %s", e.what());
-    }
-    _prvT = start_t;
-
-    _hdt.buildHumanTracks( _humanROIs );
-    
-#ifdef _DEBUG_BT_    
-    // Draw bounding boxes for human (green) and gun (red)
-    Mat img = imgPtr->image.clone();
-    _hdt.drawHumanTracks( img, _camPos );
-    if ( isValid(gunROI) )
-    {
-        rectangle( img, gunROI, Scalar(0, 0, 255), 2 );
-        static int imgnum = 0;            
-        std::string path1;
-        path1 = OUT_FOLDER + std::to_string(_camPos);
-        path1 = path1 + "-";
-        path1 = path1 + std::to_string(imgnum);
-        path1 = path1 + ".png";
-        imwrite( path1, img );
-
-        imgnum++;
-    }
-#endif  // _DEBUG_BT_    
+        hbbox.x      = humanROI.x;
+        hbbox.y      = humanROI.y;
+        hbbox.width  = humanROI.width;
+        hbbox.height = humanROI.height;        
+        _pub.publish(hbbox);
+    }       
 }
 
 // if anyone connects to me, I subscribe camera

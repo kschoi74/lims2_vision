@@ -39,7 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
     <group ns="zed">
 	<!-- Nodelet Manager -->
-        <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name)"  args="manager" output="screen" />
+        <node pkg="nodelet" type="nodelet" name="$(arg nodelet_manager_name)" args="manager" output="screen" />
 
         <!-- ZED wrapper as nodelet -->
         <include file="$(find zed_wrapper)/launch/zed_camera_nodelet.launch">
@@ -66,6 +66,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             <remap from="image_l" to="$(arg left_img_topic)"/>
             <remap from="image_r" to="$(arg right_img_topic)"/>
         </node>
+
+        <!--
+        <node pkg="lims2_vision" type="bullet_track" launch-prefix="xterm -e gdb args" name="bullet_track">            
+            <remap from="image_l" to="$(arg left_img_topic)"/>
+            <remap from="image_r" to="$(arg right_img_topic)"/>
+        </node> -->
 
     </group>
 </launch>

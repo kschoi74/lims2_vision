@@ -1,5 +1,5 @@
-#ifndef HUMANDETECT_
-#define HUMANDETECT_
+#ifndef _HUMANDETECT_
+#define _HUMANDETECT_
 
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/platform/env.h"

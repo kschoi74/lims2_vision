@@ -167,7 +167,13 @@ add_definitions(-std=c++11 -g -O3)
 set(LINK_LIBRARIES
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
+  opencv_ximgproc
 )
+
+## message(STATUS "====kschoi====")
+## message(STATUS ${OpenCV_LIBRARY_DIRS})
+## message(STATUS ${OpenCV_LIBS})
+## message(STATUS ${LINK_LIBRARIES})
 
 ## Declare a C++ library
 add_library(HumanDetect src/HumanDetect.cpp)
@@ -184,15 +190,19 @@ add_executable(gun_detect src/gun_detect.cpp)
 target_link_libraries(gun_detect GunDetectROS ${catkin_LIBRARIES})
 
 
-add_library(BulletTrack src/lims2_vision_util.cpp src/BulletTrack.cpp)
+add_library(BulletTrack src/lims2_vision_util.cpp src/BulletTrack.cpp 
+                        src/ProjGeometry.cpp src/GunDetect.cpp src/CoRects.cpp)
 add_dependencies(BulletTrack ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(BulletTrack ${catkin_LIBRARIES})
+target_link_libraries(BulletTrack ${LINK_LIBRARIES})
 
 add_library(BulletTrackROS src/BulletTrackROS.cpp)
 target_link_libraries(BulletTrackROS BulletTrack ${catkin_LIBRARIES})
 
 add_library(BulletTrackNodelet src/BulletTrackNodelet.cpp)
 target_link_libraries(BulletTrackNodelet BulletTrackROS ${catkin_LIBRARIES})
+
+add_executable(bullet_track src/bullet_track.cpp)
+target_link_libraries(bullet_track BulletTrackROS ${catkin_LIBRARIES})
 # add_executable(hd src/hd.cpp)
 # target_link_libraries(hd
 #   ${LINK_LIBRARIES}
