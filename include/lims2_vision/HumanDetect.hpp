@@ -3,17 +3,17 @@
 
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/platform/env.h"
-#include <ros/ros.h>
-#include <ros/package.h>
-#include <sensor_msgs/Image.h>
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
 #include <vector>
 #include <list>
+#include <ros/ros.h>
+#include <ros/package.h>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <lims2_vision/lims2_vision_global.h>
+#include <lims2_vision/MiniZEDWrapper.hpp>
 
 namespace lims2_vision
 {
-    const cv::Size FHD_SIZE(1280, 720);
     const int      HUMAN_LOST_LIMIT(1);
 
     class HumanInfo;
@@ -74,32 +74,39 @@ namespace lims2_vision
         std::string getStatus();
     };
 
-    class HumanDetect
+    class HumanDetector
     {
-    private:
+        private:
         //constant tensor names for tensorflow object detection api
         const std::string IMAGE_TENSOR       = "image_tensor:0";
         const std::string DETECTION_BOXES    = "detection_boxes:0";
         const std::string DETECTION_SCORES   = "detection_scores:0";
         const std::string DETECTION_CLASSES  = "detection_classes:0";
         const std::string NUM_DETECTIONS     = "num_detections:0";
+        std::thread _hDetectThread;
+        bool        _bRun;
 
     protected:
         float                   _threshold; 
         tensorflow::Session*    _session; 
         tensorflow::GraphDef    _graph_def;
         tensorflow::Tensor      _input_tensor;
-        HumanTracks             _humanTracks;
+        
+        HumanTracks             _humanTracks[2];
+        std::vector<HumanInfo>  _humanROIs[2];        
+        StereoImgCQ &           _sImgs;
+        StereoROI &             _hROIs;                
 
     public:
-        HumanDetect();
-        ~HumanDetect();
+        HumanDetector(StereoImgCQ & sImgs, StereoROI & hregion);
+        ~HumanDetector();
+        void shutdown();
 
-        int detectHuman(const sensor_msgs::ImageConstPtr& img_msg, std::vector<HumanInfo> & humanInfos);
-        cv::Rect getBestHumanROI() const;
+        void detect();
+        int detectHuman(const cv::Mat & img, std::vector<HumanInfo> & humanInfos);
+        cv::Rect getBestHumanROI(int v) const;
 
-        void buildHumanTracks(std::vector<HumanInfo> & humanInfos);
-        void drawHumanTracks(cv::Mat & img, int camPos );
+        void buildHumanTracks(int v, std::vector<HumanInfo> & humanInfos);        
     };
 }
 

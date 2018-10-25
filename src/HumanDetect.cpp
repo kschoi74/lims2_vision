@@ -1,5 +1,5 @@
 #include <lims2_vision/lims2_vision_global.h>
-#include <lims2_vision/HumanDetect.h>
+#include <lims2_vision/HumanDetect.hpp>
 #include <opencv2/imgproc.hpp>
 
 using namespace lims2_vision;
@@ -54,7 +54,7 @@ bool HumanInfoHistory::update(const HumanInfo & hi)
     _prob = prob / _hiHist.size();
     _avgWidth = avgWidth / _hiHist.size();
 
-    _prob += 1.0f - fabs( (FHD_SIZE.width / 2.0f - hi.center().x) / 1000.0f );
+    _prob += 1.0f - fabs( (IMG_RECT.width / 2.0f - hi.center().x) / 1000.0f );
     _prob /= 2.0f;
 
     _lostCount = 0;
@@ -78,7 +78,7 @@ bool HumanInfoHistory::findClosest(HIVIter & hiiter, vector<HumanInfo> & humanIn
 {
     if ( humanInfos.size() == 0 ) return false;
 
-    float minDist = FHD_SIZE.width + FHD_SIZE.height;
+    float minDist = IMG_RECT.width + IMG_RECT.height;
     const Point2f & center = getLastPosition();
     HIVIter it = humanInfos.begin();
     hiiter = it;
@@ -183,14 +183,18 @@ void HumanTracks::linkClosest(vector<HumanInfo> & humanInfos)
 
     int nHIs = humanInfos.size();
     if ( nHIs == 0 ) {
+#ifdef _DEBUG_HT_            
         ROS_INFO("HT::link Human is not detected, increase all the lost counts");
+#endif            
         for ( auto & hih : _humanTracks ) 
             hih.incLostCount();
         return;
     }
 
     if ( _humanTracks.size() == 0 ) {
+#ifdef _DEBUG_HT_    
         ROS_INFO("HT::link There is no HumanInfoHistory, so skip linking");
+#endif            
         return;
     }
     
@@ -365,10 +369,14 @@ void HumanTracks::draw(Mat & img, int camPos, bool write)
 
 //////////////////////////////////
 //
-// HumanDetect
+// HumanDetector
 //
-HumanDetect::HumanDetect() : _input_tensor(DT_UINT8, TensorShape({1, FHD_SIZE.height, FHD_SIZE.width, 3})), _threshold(0.85)
-{
+HumanDetector::HumanDetector(StereoImgCQ & sImgs, StereoROI & hregion)
+ : _sImgs(sImgs),
+   _hROIs(hregion),
+   _input_tensor(DT_UINT8, TensorShape({1, IMG_RECT.height, IMG_RECT.width, 3})), 
+   _threshold(HUMAN_DETECTION_THR)
+{    
     // Initialize a tensorflow session
     SessionOptions options = SessionOptions();
     options.config.mutable_gpu_options()->set_allow_growth(true);
@@ -399,17 +407,85 @@ HumanDetect::HumanDetect() : _input_tensor(DT_UINT8, TensorShape({1, FHD_SIZE.he
     if (!run_status.ok()) {
         ROS_INFO_STREAM( "TF Initial Run - Failed to run interference model: " << run_status.ToString() );        
     }
+
+    _humanROIs[0].clear();
+    _humanROIs[1].clear();
+    // Start pool thread
+    _hDetectThread = std::thread(&HumanDetector::detect, this);
 }
 
-HumanDetect::~HumanDetect() { }
+HumanDetector::~HumanDetector() {
+    shutdown();
+}
 
-int HumanDetect::detectHuman(const sensor_msgs::ImageConstPtr& img_msg, vector<HumanInfo> & humanInfos)
+void HumanDetector::shutdown() {
+    if (_hDetectThread.joinable()) {
+        _bRun = false;
+        _hDetectThread.join();
+    }
+}
+void HumanDetector::detect() 
 {
-    auto image = img_msg->data; // std::vector<uint8>
-    const auto rows = img_msg->height;
-    const auto cols = img_msg->width;
+    ros::Rate loop_rate(1);
+    _bRun = true;
 
-    ROS_ASSERT( rows == FHD_SIZE.height && cols == FHD_SIZE.width );
+    // Main loop
+    while ( ros::ok() && _bRun ) {
+        // human detection using tensorflow
+        StereoImg & simg = _sImgs.getLastStereoImg();
+        //ROS_INFO_STREAM("HumanDetector::detect " << makeString(simg.getStamp()));
+        try {
+            detectHuman(simg.getImage(0), _humanROIs[0]);
+            detectHuman(simg.getImage(1), _humanROIs[1]);
+        }
+        catch (std::runtime_error& e) {
+            ROS_ERROR_THROTTLE(1.0, "Could not detect human: %s", e.what());
+        }
+        
+        buildHumanTracks( 0, _humanROIs[0] );
+        buildHumanTracks( 1, _humanROIs[1] );
+
+        // if there is no person in the scene, ROI is resetted. (-1 -1 -1 -1)
+        {
+            boost::mutex::scoped_lock lock(_hROIs._mutex);        
+            _hROIs._ROI[0] = getBestHumanROI(0);        
+            _hROIs._ROI[1] = getBestHumanROI(1);        
+            _hROIs._stamp = simg.getStamp();
+        }
+        // ROS_INFO_STREAM("HumanDetector::detect ROI acquired  " << makeString(_hROIs._ROI[0]) 
+        //                                                << ", " << makeString(_hROIs._ROI[1]));        
+        
+        static int rateWarnCount = 0;
+        if (!loop_rate.sleep()) {
+            rateWarnCount++;
+
+            if (rateWarnCount == 10) {
+                ROS_DEBUG_THROTTLE(
+                    1.0,
+                    "Working thread is not synchronized with the Camera frame rate");
+                ROS_DEBUG_STREAM_THROTTLE(
+                    1.0, "Expected cycle time: " << loop_rate.expectedCycleTime()
+                    << " - Real cycle time: "
+                    << loop_rate.cycleTime());
+                ROS_WARN_THROTTLE(10.0, "Elaboration takes longer than requested "
+                                      "by the FPS rate. Please consider to "
+                                      "lower the 'frame_rate' setting.");
+            }
+        } else {
+            rateWarnCount = 0;
+        }
+    }
+
+    ROS_DEBUG("Human Detect thread finished");
+}
+
+int HumanDetector::detectHuman(const cv::Mat & img, vector<HumanInfo> & humanInfos)
+{
+    auto image = img.data; // std::vector<uint8>
+    const auto rows = img.rows;
+    const auto cols = img.cols;
+
+    ROS_ASSERT( rows == IMG_RECT.height && cols == IMG_RECT.width );
     
     auto image_data = _input_tensor.shaped<uint8_t, 3>({rows, cols, 3});
     int i = 0;
@@ -454,18 +530,12 @@ int HumanDetect::detectHuman(const sensor_msgs::ImageConstPtr& img_msg, vector<H
     return humanInfos.size();
 }
 
-void HumanDetect::buildHumanTracks(vector<HumanInfo> & humanInfos)
+void HumanDetector::buildHumanTracks(int v, vector<HumanInfo> & humanInfos)
 {
-    _humanTracks.update( humanInfos );    
+    _humanTracks[v].update( humanInfos );    
 }
 
-Rect HumanDetect::getBestHumanROI() const
+Rect HumanDetector::getBestHumanROI(int v) const
 {
-    return _humanTracks.getBestHumanROI();
+    return _humanTracks[v].getBestHumanROI();
 }
-
-void HumanDetect::drawHumanTracks(cv::Mat & img, int camPos )
-{
-    _humanTracks.draw(img, camPos);
-}
-

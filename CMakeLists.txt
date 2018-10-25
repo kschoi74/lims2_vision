@@ -21,6 +21,20 @@ checkPackage("OPENCV_CORE" "OpenCV core not found, install it from the tutorial 
 checkPackage("OPENCV_HIGHGUI" "OpenCV highgui not found, install it from the tutorial at:\n https://www.stereolabs.com/documentation/overview/getting-started/getting-started.html")
 checkPackage("OPENCV_IMGPROC" "OpenCV imgproc not found, install it from the tutorial at:\n https://www.stereolabs.com/documentation/overview/getting-started/getting-started.html")
 
+find_package(ZED 2.3)
+checkPackage("ZED" "ZED SDK not found, install it from:\n https://www.stereolabs.com/developers/")
+
+find_package(CUDA)
+checkPackage("CUDA" "CUDA not found, install it from:\n https://developer.nvidia.com/cuda-downloads")
+
+find_package(OpenMP)
+checkPackage("OpenMP" "OpenMP not found, please install it to improve performances: 'sudo apt install libomp-dev'")
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
+
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -133,20 +147,20 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES 
     lims2_vision 
-    HumanDetect GunDetectROS GunDetectNodelet 
-    BulletTrack BulletTrackROS BulletTrackNodelet
+    HumanDetect 
+    bullet_track_zed 
   CATKIN_DEPENDS 
-    roscpp 
-    rospy 
-    std_msgs 
-    sensor_msgs
-    cv_bridge
-    image_transport
-    image_geometry
-    nodelet
-    message_runtime
+    roscpp
 #  DEPENDS system_lib
 )
+
+###############################################################################
+# SOURCES
+
+set(TOOLS_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/src/sl_tools.cpp )
+
+###############################################################################
 
 ###########
 ## Build ##
@@ -158,51 +172,52 @@ include_directories(
   ${tensorflow_ros_cpp_INCLUDE_DIRS}
   include
   ${catkin_INCLUDE_DIRS}
+  ${CUDA_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${ZED_INCLUDE_DIRS}
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/tools/include
 )
 
+link_directories(${CUDA_LIBRARY_DIRS})
 link_directories(${OpenCV_LIBRARY_DIRS})
+link_directories(${ZED_LIBRARY_DIR})
+
+if(NOT DEFINED CUDA_NPP_LIBRARIES_ZED)
+    #To deal with cuda 9 nppi libs and previous versions of ZED SDK
+    set(CUDA_NPP_LIBRARIES_ZED ${CUDA_npp_LIBRARY} ${CUDA_npps_LIBRARY} ${CUDA_nppi_LIBRARY})   
+endif()
 
 add_definitions(-std=c++11 -g -O3)
 set(LINK_LIBRARIES
   ${catkin_LIBRARIES}
+  ${ZED_LIBRARIES}
+  ${CUDA_LIBRARIES} ${CUDA_NPP_LIBRARIES_ZED}
   ${OpenCV_LIBS}
   opencv_ximgproc
 )
-
-## message(STATUS "====kschoi====")
-## message(STATUS ${OpenCV_LIBRARY_DIRS})
-## message(STATUS ${OpenCV_LIBS})
-## message(STATUS ${LINK_LIBRARIES})
 
 ## Declare a C++ library
 add_library(HumanDetect src/HumanDetect.cpp)
 add_dependencies(HumanDetect ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(HumanDetect ${tensorflow_ros_cpp_LIBRARIES} ${catkin_LIBRARIES})
 
-add_library(GunDetectROS src/lims2_vision_util.cpp src/GunDetectROS.cpp src/GunDetect.cpp)
-target_link_libraries(GunDetectROS HumanDetect ${catkin_LIBRARIES})
+add_library(BulletTracker 
+                src/lims2_vision_util.cpp 
+                src/BulletTracker.cpp 
+                src/ProjGeometry.cpp 
+                src/GunDetect.cpp 
+                src/CoRects.cpp
+            )
+add_dependencies(BulletTracker ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(BulletTracker ${LINK_LIBRARIES})
 
-add_library(GunDetectNodelet src/GunDetectNodelet.cpp)
-target_link_libraries(GunDetectNodelet GunDetectROS ${catkin_LIBRARIES})
+add_executable(bullet_track_zed 
+                src/lims2_vision_util.cpp 
+                src/bullet_track_zed.cpp 
+                src/MiniZEDWrapper.cpp ${TOOLS_SRC}
+                )
+target_link_libraries(bullet_track_zed HumanDetect BulletTracker ${LINK_LIBRARIES})
 
-add_executable(gun_detect src/gun_detect.cpp)
-target_link_libraries(gun_detect GunDetectROS ${catkin_LIBRARIES})
-
-
-add_library(BulletTrack src/lims2_vision_util.cpp src/BulletTrack.cpp 
-                        src/ProjGeometry.cpp src/GunDetect.cpp src/CoRects.cpp)
-add_dependencies(BulletTrack ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(BulletTrack ${LINK_LIBRARIES})
-
-add_library(BulletTrackROS src/BulletTrackROS.cpp)
-target_link_libraries(BulletTrackROS BulletTrack ${catkin_LIBRARIES})
-
-add_library(BulletTrackNodelet src/BulletTrackNodelet.cpp)
-target_link_libraries(BulletTrackNodelet BulletTrackROS ${catkin_LIBRARIES})
-
-add_executable(bullet_track src/bullet_track.cpp)
-target_link_libraries(bullet_track BulletTrackROS ${catkin_LIBRARIES})
 # add_executable(hd src/hd.cpp)
 # target_link_libraries(hd
 #   ${LINK_LIBRARIES}
