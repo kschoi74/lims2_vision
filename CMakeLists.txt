@@ -201,15 +201,20 @@ add_library(HumanDetect src/HumanDetect.cpp)
 add_dependencies(HumanDetect ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(HumanDetect ${tensorflow_ros_cpp_LIBRARIES} ${catkin_LIBRARIES})
 
+#add_library(Lims2Controller src/Lims2Controller.cpp)
+#add_dependencies(Lims2Controller ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+#target_link_libraries(Lims2Controller ${LINK_LIBRARIES})
+
 add_library(BulletTracker 
                 src/lims2_vision_util.cpp 
                 src/BulletTracker.cpp 
                 src/ProjGeometry.cpp 
                 src/GunDetect.cpp 
                 src/CoRects.cpp
+                src/Lims2Controller.cpp
             )
 add_dependencies(BulletTracker ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(BulletTracker ${LINK_LIBRARIES})
+target_link_libraries(BulletTracker  ${LINK_LIBRARIES})
 
 add_executable(bullet_track_zed 
                 src/lims2_vision_util.cpp 

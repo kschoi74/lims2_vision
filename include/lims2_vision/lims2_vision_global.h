@@ -63,4 +63,7 @@ struct StereoROI
     StereoROI & operator=(const StereoROI & rhs);    
 };
 
+
+enum STATE { _STATE_LOST, _STATE_HT, _STATE_GT, _STATE_AIM, _STATE_BT, _STATE_CLEANUP };        
+
 #endif  // __LIMS2_VISION_GLOBAL_

@@ -64,11 +64,17 @@ void sumChannels(cv::Mat & dst, const cv::Mat & clrImg)
 //
 // BulletTracker
 //
-BulletTracker::BulletTracker(StereoImgCQ & simgs, StereoROI & hRegion)    
+BulletTracker::BulletTracker(StereoImgCQ & simgs, StereoROI & hRegion, Lims2Controller & controller)    
 : _sImgs(simgs),
-  _humanROIsDetected(hRegion)
+  _humanROIsDetected(hRegion),
+  _controller(controller)
 {
-    ROS_INFO( "BulletTracker Constructor!!" );    
+    ROS_INFO( "//////////////////////////////////////////" );    
+    ROS_INFO( "//" );    
+    ROS_INFO( "//    BulletTracker Constructor !!" );    
+    ROS_INFO( "//" );    
+    ROS_INFO( "//////////////////////////////////////////" );    
+
     Rect initRect(-1,-1,-1,-1);
 
     _isHumanStable = false;
@@ -135,7 +141,9 @@ void BulletTracker::process()
             if ( _trackStartCount > 0 ) _trackStartCount--;
 
             if ( condPredictTrajectory() ) 
+            { 
                 predictTrajectoryNCleanup();
+            }
         }
         else {
             ROS_ASSERT( _state == _STATE_CLEANUP );
@@ -234,8 +242,8 @@ bool BulletTracker::detectGun()
     float d0 = dist(prvGunCtr[0], center(_gunROI[0]));
     float d1 = dist(prvGunCtr[1], center(_gunROI[1]));
     _isGunStable = (gunDetected == true) && (d0 + d1 < 3.0f) 
-                && _gunROI[0].width < _gunROI[0].height 
-                && _gunROI[1].width < _gunROI[1].height;
+                && _gunROI[0].width < _gunROI[0].height*1.3 
+                && _gunROI[1].width < _gunROI[1].height*1.3;
 
     if ( _isGunStable )
         _gunStableCount++;
@@ -407,7 +415,11 @@ int BulletTracker::getBulletROIImages()
         // then, the bullet position becomes zero in the x axis of the ROI region.
         // It makes the estimated bullet position go to the ceil.
         saveEventImages();
-        ROS_ASSERT(0);
+        // TODO:
+        if ( _state == _STATE_BT ) {
+            changeState( _STATE_LOST );
+            return count;
+        }
     }
 
     _sImgIdx[0] = _sImgs.getCurrentIndex();
@@ -464,7 +476,7 @@ void BulletTracker::detectBullet()
         int maxS;
         sumChannels<unsigned char>(sch[i], _difBulletROIImg[0][i]);
         
-        threshold(sch[i], blob[i], 60, 255, THRESH_BINARY);
+        threshold(sch[i], blob[i], 50, 255, THRESH_BINARY);
 
         blob[i].convertTo(blob[i], CV_8U);
         morphologyEx(blob[i], blob[i], MORPH_CLOSE, getStructuringElement(MORPH_RECT, Size(5,5)));
@@ -669,8 +681,7 @@ void BulletTracker::predictTrajectoryNCleanup()
 {
     static int funcCount = 0;
 
-    Point3d predP;
-    if ( predictTrajectory2(predP) ) {
+    if ( predictTrajectory(_predEndPoint) ) {
         float z_start = (_traj.front().z + _traj.back().z) / 2.0f;
         for ( int i = 0 ; i < _predTraj.rows; i++ )
         {
@@ -750,7 +761,7 @@ bool BulletTracker::predictTrajectory(Point3d & predP)
         return false;
 
     // equi-acceleration 
-    const double G2 = 9.80665 / 2.0;
+    const double G2 = 9.80665 / 2.5;
     const float TargetZ = 0.4;
 
     Mat pts( n, 3, CV_32F );    
@@ -776,7 +787,7 @@ bool BulletTracker::predictTrajectory(Point3d & predP)
     ROS_INFO_STREAM("mpts: " << mpts.at<float>(0,0) << ", " << mpts.at<float>(0,1) << ", " << mpts.at<float>(0,2));
 
     PCA pc(m0pts, noArray(), PCA::DATA_AS_ROW);
-    ROS_ASSERT( pc.eigenvalues.at<float>(0) > pc.eigenvalues.at<float>(1) * 40);
+    //ROS_ASSERT( pc.eigenvalues.at<float>(0) > pc.eigenvalues.at<float>(1) * 40);
 
     Mat V = pc.eigenvectors.row(0);
     float t1 = (TargetZ - mpts.at<float>(2)) / V.at<float>(2);
@@ -812,6 +823,7 @@ void BulletTracker::changeState(const STATE state)
     switch( state )
     {
     case _STATE_LOST:
+        _controller.manipulate(_state);
         _gunLostCount = 0;   
         _gunStableCount = 0;
         _cleanupCount = 0;     
@@ -822,6 +834,7 @@ void BulletTracker::changeState(const STATE state)
         break;
 
     case _STATE_HT:
+        _controller.manipulate(_state);
         _gunLostCount = 0; 
         _gunStableCount = 0;
         _cleanupCount = 0;       
@@ -831,17 +844,21 @@ void BulletTracker::changeState(const STATE state)
         break;
 
     case _STATE_GT:       
+        _controller.manipulate(_state);
         _gunStableCount = 0;         
         break;
 
     case _STATE_AIM:
+        _controller.manipulate(_state);
         break;
 
     case _STATE_BT:
+        _controller.manipulate(_state);
         _trackStartCount = 0;
         break;   
 
     case _STATE_CLEANUP:
+        _controller.manipulate(_state, &_predEndPoint);
         _cleanupCount = 30; 
         _traj.clear();
         _stamp.clear();
@@ -849,7 +866,7 @@ void BulletTracker::changeState(const STATE state)
 
     default:
         ROS_ASSERT(0);                     
-    }
+    }    
     drawStatus(true);
 }
 

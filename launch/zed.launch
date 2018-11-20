@@ -45,5 +45,5 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <param name="gain"                  value="100" />
         <param name="exposure"              value="100" />
         <param name="auto_exposure"         value="true" />
-    </node>
+    </node>    
 </launch>

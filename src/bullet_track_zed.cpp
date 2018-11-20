@@ -2,6 +2,7 @@
 #include <lims2_vision/MiniZEDWrapper.hpp>
 #include <lims2_vision/HumanDetect.hpp>
 #include <lims2_vision/BulletTracker.hpp>
+#include <lims2_vision/Lims2Controller.hpp>
 
 #include <signal.h>
 
@@ -22,15 +23,15 @@ void mySigintHandler(int sig)
 
 int main(int argc, char **argv){
     ros::init(argc, argv, "bullet_track_zed");
-    ros::NodeHandle pnh;    
+    ros::NodeHandle nh;    
+    StereoROI hRegion;
 
     signal(SIGINT, mySigintHandler);
 
-    StereoROI hRegion;
-
-    MiniZEDWrapper btZED(pnh);
+    Lims2Controller controller(nh);
+    MiniZEDWrapper btZED(nh);
     HumanDetector hdt(btZED.getStereoImageQueue(), hRegion);
-    BulletTracker blt(btZED.getStereoImageQueue(), hRegion);
+    BulletTracker blt(btZED.getStereoImageQueue(), hRegion, controller);
     pZED = &btZED;
     pHDT = &hdt;
     pBLT = &blt;

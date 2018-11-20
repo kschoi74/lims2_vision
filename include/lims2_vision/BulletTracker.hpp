@@ -7,6 +7,8 @@
 #include <lims2_vision/MiniZEDWrapper.hpp>
 #include <lims2_vision/ProjGeometry.h>
 #include <lims2_vision/CoRects.h>
+#include <lims2_vision/Lims2Controller.hpp>
+
 #include <boost/thread/mutex.hpp>
 #include <list>
 
@@ -24,8 +26,6 @@ namespace lims2_vision
 {
     class BulletTracker
     {
-        enum STATE { _STATE_LOST, _STATE_HT, _STATE_GT, _STATE_AIM, _STATE_BT, _STATE_CLEANUP };        
-
         void changeState(const STATE state);
         int  getBulletROIImages();
         void predictBulletPosition();
@@ -75,6 +75,9 @@ namespace lims2_vision
         std::vector<ros::Time>   _stamp;
         cv::Mat                  _predTraj;
 
+        cv::Point3d              _predEndPoint;
+        Lims2Controller &        _controller;
+
         // check
         StereoImgCQ     _eventImgs;        
         cv::Mat         _trackImgs[2];
@@ -82,7 +85,7 @@ namespace lims2_vision
         std::string     _lastmsg[4];
 
     public:
-        BulletTracker(StereoImgCQ & simgs, StereoROI & hRegion);
+        BulletTracker(StereoImgCQ & simgs, StereoROI & hRegion, Lims2Controller & controller);
         ~BulletTracker();
         void shutdown();
 
